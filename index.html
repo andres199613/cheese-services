@@ -630,7 +630,7 @@ function buildExpandedHTML(key, iconHTML, titleHTML, desc) {
   var flatTitle    = titleHTML.replace(/<br\s*\/?>/gi, " "); /* one line in expanded card */
   return (
     '<div class="dp__head">' +
-      '<div class="dp__head-icon">' + (ANIMATED_ICONS[key] || iconHTML) + '</div>' +
+      '<div class="dp__head-icon">' + ((cardData[key] && cardData[key].staticIconHTML) || iconHTML) + '</div>' +
       '<div class="dp__head-main">' +
         '<span class="dp__service">' + flatTitle + '</span>' +
       '</div>' +
@@ -853,18 +853,13 @@ function expandCard(cw) {
     var footer = cmsEl.querySelector('.carousel-footer');
     if (footer) footer.classList.add('is-hidden');
 
+    /* RAF-snap: re-apply scroll in the very next frame so any compositor
+       reset caused by the CSS transition starting is immediately corrected. */
+    requestAnimationFrame(function() { mobileSnap(target, 'raf'); });
+
     /* Post-snap: after the flex transition, re-snap in case expansion pushed the
        scrollWidth wider (e.g. last card), now allowing us to reach `target`. */
     setTimeout(function() { mobileSnap(target, 'post'); }, FLEX_MS + 20);
-
-    var iconFired = false;
-    cw.addEventListener('transitionend', function onCardOpen(e) {
-      if (e.target !== cw || iconFired) return;
-      iconFired = true;
-      cw.removeEventListener('transitionend', onCardOpen);
-      var icon = card.querySelector('.dp__head-icon lord-icon');
-      if (icon) icon.setAttribute('trigger', 'in');
-    });
 
     return;
   }
