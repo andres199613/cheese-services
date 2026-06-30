@@ -832,15 +832,18 @@ function expandCard(cw) {
        The scrollLeft fallback covers older browsers.
        No overflow toggle — toggling overflow while writing scrollLeft caused
        a repaint of the clipped (blank) state, producing the visible flash. */
-    var mobileSnap = function(pos) {
+    var mobileSnap = function(pos, label) {
       var maxScroll = viewport.scrollWidth - viewport.clientWidth;
       var snapped   = Math.max(0, Math.min(pos, maxScroll));
-      try { viewport.scrollTo({ left: snapped, behavior: 'instant' }); } catch (e) {}
+      console.log('[cheese] mobileSnap', label, '| pos:', pos, '| snapped:', snapped, '| maxScroll:', maxScroll, '| clientWidth:', viewport.clientWidth, '| scrollWidth:', viewport.scrollWidth);
+      try { viewport.scrollTo({ left: snapped, behavior: 'instant' }); } catch (e) { console.warn('[cheese] scrollTo failed', e); }
       viewport.scrollLeft = snapped;
+      console.log('[cheese] scrollLeft after set:', viewport.scrollLeft);
     };
 
     /* Pre-snap: bring the card's left edge to `pad` from the viewport left. */
-    mobileSnap(target);
+    console.log('[cheese] expandCard key:', key, '| target:', target, '| ecw:', ecw, '| vpW:', vpW, '| pad:', pad, '| cardScrollLeft:', cardScrollLeft);
+    mobileSnap(target, 'pre');
 
     card.innerHTML = buildExpandedHTML(key, cardData[key].iconHTML, cardData[key].titleHTML, cardData[key].desc);
     cw.style.flex = "0 0 " + ecw + "px";
@@ -852,7 +855,7 @@ function expandCard(cw) {
 
     /* Post-snap: after the flex transition, re-snap in case expansion pushed the
        scrollWidth wider (e.g. last card), now allowing us to reach `target`. */
-    setTimeout(function() { mobileSnap(target); }, FLEX_MS + 20);
+    setTimeout(function() { mobileSnap(target, 'post'); }, FLEX_MS + 20);
 
     var iconFired = false;
     cw.addEventListener('transitionend', function onCardOpen(e) {
