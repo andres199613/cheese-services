@@ -553,7 +553,10 @@ var LI_SRC = {
 };
 
 function liAnimated(key) {
-  return '<lord-icon src="' + LI_SRC[key] + '" trigger="none" colors="' + LI_COLORS + '" style="width:72px;height:72px"></lord-icon>';
+  /* Placeholder — lord-icon is injected via RAF after scroll commit to avoid
+     connectedCallback blocking the scroll paint (trigger="none" errors on
+     live lordicon when src is present at connection time). */
+  return '<span class="dp__icon-ph" data-li-key="' + key + '" style="display:block;width:72px;height:72px"></span>';
 }
 
 var ANIMATED_ICONS = {
@@ -854,31 +857,34 @@ function expandCard(cw) {
     if (footer) footer.classList.add('is-hidden');
 
     /* RAF-snap: re-apply scroll in the very next frame so any compositor
-       reset caused by the CSS transition starting is immediately corrected. */
-    requestAnimationFrame(function() { mobileSnap(target, 'raf'); });
+       reset caused by the CSS transition starting is immediately corrected.
+       Also inject the lord-icon here (deferred from innerHTML) so its heavy
+       connectedCallback doesn't block the scroll paint. */
+    requestAnimationFrame(function() {
+      mobileSnap(target, 'raf');
+
+      var ph = card.querySelector('.dp__icon-ph[data-li-key]');
+      if (ph && LI_SRC[key]) {
+        var li = document.createElement('lord-icon');
+        li.setAttribute('src', LI_SRC[key]);
+        li.setAttribute('colors', LI_COLORS);
+        li.style.cssText = 'width:72px;height:72px;display:block';
+        ph.parentNode.replaceChild(li, ph);
+        /* Poll until ready, then play once */
+        var pollId = setInterval(function() {
+          var p = li.playerInstance;
+          if (p && p.isReady) {
+            clearInterval(pollId);
+            try { p.play(); } catch (err) {}
+          }
+        }, 50);
+        setTimeout(function() { clearInterval(pollId); }, 3000);
+      }
+    });
 
     /* Post-snap: after the flex transition, re-snap in case expansion pushed the
        scrollWidth wider (e.g. last card), now allowing us to reach `target`. */
     setTimeout(function() { mobileSnap(target, 'post'); }, FLEX_MS + 20);
-
-    /* After transition, play the icon animation via playerInstance (avoids
-       unregistered-trigger error from setAttribute('trigger','in')). */
-    var iconFired = false;
-    cw.addEventListener('transitionend', function onCardOpen(e) {
-      if (e.target !== cw || iconFired) return;
-      iconFired = true;
-      cw.removeEventListener('transitionend', onCardOpen);
-      var icon = card.querySelector('.dp__head-icon lord-icon');
-      if (!icon) return;
-      var pollId = setInterval(function() {
-        var p = icon.playerInstance;
-        if (p && p.isReady) {
-          clearInterval(pollId);
-          try { p.play(); } catch (err) {}
-        }
-      }, 50);
-      setTimeout(function() { clearInterval(pollId); }, 3000);
-    });
 
     return;
   }
