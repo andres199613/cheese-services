@@ -72,7 +72,9 @@
       margin-top: -10px;         /* cancel layout shift from padding-top */
       margin-bottom: -44px;
       scrollbar-width: none;
-      -webkit-overflow-scrolling: touch;
+      /* -webkit-overflow-scrolling: touch removed — deprecated in iOS 13+
+         and it moves scroll physics to the compositor thread, which
+         ignores JS scrollLeft writes during momentum scroll. */
     }
     #cms .carousel-viewport::-webkit-scrollbar { display: none; }
 
@@ -824,15 +826,18 @@ function expandCard(cw) {
   if (ecw < vpW) target = Math.max(target, cardScrollLeft + ecw - vpW + pad);
   target = Math.max(0, target);
 
-  /* ── Mobile: instant scroll to avoid iOS momentum-scroll interference ── */
+  /* ── Mobile: instant scroll ────────────────────────────────────────── */
   if (window.innerWidth <= 480) {
-    /* Stop any in-flight touch momentum by toggling overflow, then snap. */
-    function mobileSnap(pos) {
-      viewport.style.overflowX = 'hidden';
-      void viewport.offsetHeight;
-      viewport.scrollLeft = Math.max(0, Math.min(pos, viewport.scrollWidth - vpW));
-      viewport.style.overflowX = '';
-    }
+    /* scrollTo({behavior:'instant'}) cancels momentum natively (iOS 15.4+).
+       The scrollLeft fallback covers older browsers.
+       No overflow toggle — toggling overflow while writing scrollLeft caused
+       a repaint of the clipped (blank) state, producing the visible flash. */
+    var mobileSnap = function(pos) {
+      var maxScroll = viewport.scrollWidth - viewport.clientWidth;
+      var snapped   = Math.max(0, Math.min(pos, maxScroll));
+      try { viewport.scrollTo({ left: snapped, behavior: 'instant' }); } catch (e) {}
+      viewport.scrollLeft = snapped;
+    };
 
     /* Pre-snap: bring the card's left edge to `pad` from the viewport left. */
     mobileSnap(target);
@@ -928,7 +933,11 @@ function collapseCard(cw, instant) {
 
 /* ── Click handler ────────────────────────────────────────────── */
 function handleCardClick(cw) {
-  if (expandedCw === cw) { collapseCard(cw, false); return; }
+  /* On mobile use instant collapse: if we animate the close, expandedCw is
+     cleared immediately but the card's flex keeps transitioning. A fast tap
+     on a second card then computes positions against a mid-collapse layout,
+     producing a wrong scroll target. Instant close avoids that window. */
+  if (expandedCw === cw) { collapseCard(cw, window.innerWidth <= 480); return; }
   expandCard(cw);
 }
 
