@@ -553,7 +553,7 @@ var LI_SRC = {
 };
 
 function liAnimated(key) {
-  return '<lord-icon src="' + LI_SRC[key] + '" trigger="none" state="in-reveal" colors="' + LI_COLORS + '" style="width:72px;height:72px"></lord-icon>';
+  return '<lord-icon src="' + LI_SRC[key] + '" trigger="none" colors="' + LI_COLORS + '" style="width:72px;height:72px"></lord-icon>';
 }
 
 var ANIMATED_ICONS = {
@@ -630,7 +630,7 @@ function buildExpandedHTML(key, iconHTML, titleHTML, desc) {
   var flatTitle    = titleHTML.replace(/<br\s*\/?>/gi, " "); /* one line in expanded card */
   return (
     '<div class="dp__head">' +
-      '<div class="dp__head-icon">' + ((cardData[key] && cardData[key].staticIconHTML) || iconHTML) + '</div>' +
+      '<div class="dp__head-icon">' + (ANIMATED_ICONS[key] || iconHTML) + '</div>' +
       '<div class="dp__head-main">' +
         '<span class="dp__service">' + flatTitle + '</span>' +
       '</div>' +
@@ -860,6 +860,25 @@ function expandCard(cw) {
     /* Post-snap: after the flex transition, re-snap in case expansion pushed the
        scrollWidth wider (e.g. last card), now allowing us to reach `target`. */
     setTimeout(function() { mobileSnap(target, 'post'); }, FLEX_MS + 20);
+
+    /* After transition, play the icon animation via playerInstance (avoids
+       unregistered-trigger error from setAttribute('trigger','in')). */
+    var iconFired = false;
+    cw.addEventListener('transitionend', function onCardOpen(e) {
+      if (e.target !== cw || iconFired) return;
+      iconFired = true;
+      cw.removeEventListener('transitionend', onCardOpen);
+      var icon = card.querySelector('.dp__head-icon lord-icon');
+      if (!icon) return;
+      var pollId = setInterval(function() {
+        var p = icon.playerInstance;
+        if (p && p.isReady) {
+          clearInterval(pollId);
+          try { p.play(); } catch (err) {}
+        }
+      }, 50);
+      setTimeout(function() { clearInterval(pollId); }, 3000);
+    });
 
     return;
   }
