@@ -824,6 +824,44 @@ function expandCard(cw) {
   if (ecw < vpW) target = Math.max(target, cardScrollLeft + ecw - vpW + pad);
   target = Math.max(0, target);
 
+  /* ── Mobile: instant scroll to avoid iOS momentum-scroll interference ── */
+  if (window.innerWidth <= 480) {
+    /* Stop any in-flight touch momentum by toggling overflow, then snap. */
+    function mobileSnap(pos) {
+      viewport.style.overflowX = 'hidden';
+      void viewport.offsetHeight;
+      viewport.scrollLeft = Math.max(0, Math.min(pos, viewport.scrollWidth - vpW));
+      viewport.style.overflowX = '';
+    }
+
+    /* Pre-snap: bring the card's left edge to `pad` from the viewport left. */
+    mobileSnap(target);
+
+    card.innerHTML = buildExpandedHTML(key, cardData[key].iconHTML, cardData[key].titleHTML, cardData[key].desc);
+    cw.style.flex = "0 0 " + ecw + "px";
+    cw.classList.add("is-expanded");
+    card.setAttribute("aria-expanded", "true");
+
+    var footer = cmsEl.querySelector('.carousel-footer');
+    if (footer) footer.classList.add('is-hidden');
+
+    /* Post-snap: after the flex transition, re-snap in case expansion pushed the
+       scrollWidth wider (e.g. last card), now allowing us to reach `target`. */
+    setTimeout(function() { mobileSnap(target); }, FLEX_MS + 20);
+
+    var iconFired = false;
+    cw.addEventListener('transitionend', function onCardOpen(e) {
+      if (e.target !== cw || iconFired) return;
+      iconFired = true;
+      cw.removeEventListener('transitionend', onCardOpen);
+      var icon = card.querySelector('.dp__head-icon lord-icon');
+      if (icon) icon.setAttribute('trigger', 'in');
+    });
+
+    return;
+  }
+
+  /* ── Desktop / tablet: animated pre-scroll then expand ─────────────── */
   var preTarget       = Math.min(target, Math.max(0, viewport.scrollWidth - vpW));
   var leftAfterPre    = cardScrollLeft - preTarget;
   var needsCorrection = leftAfterPre + ecw > vpW;
@@ -833,12 +871,6 @@ function expandCard(cw) {
     cw.style.flex = "0 0 " + ecw + "px"; /* inline overrides CSS --ecw, same value but set explicitly */
     cw.classList.add("is-expanded");
     card.setAttribute("aria-expanded", "true");
-
-    /* On mobile, hide the carousel footer so it doesn't overlap the tall card */
-    if (window.innerWidth <= 480) {
-      var footer = cmsEl.querySelector('.carousel-footer');
-      if (footer) footer.classList.add('is-hidden');
-    }
 
     /* Fire icon animation only after the card finishes opening */
     var iconFired = false;
