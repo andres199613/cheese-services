@@ -923,14 +923,36 @@ function expandCard(cw) {
     cw.classList.add("is-expanded");
     card.setAttribute("aria-expanded", "true");
 
-    /* Fire icon animation only after the card finishes opening */
+    /* Inject lord-icon in the next frame (placeholder → actual element),
+       same deferred pattern as mobile so connectedCallback doesn't block. */
+    requestAnimationFrame(function() {
+      var ph = card.querySelector('.dp__icon-ph[data-li-key]');
+      if (ph && LI_SRC[key]) {
+        var li = document.createElement('lord-icon');
+        li.setAttribute('src', LI_SRC[key]);
+        li.setAttribute('colors', LI_COLORS);
+        li.style.cssText = 'width:72px;height:72px;display:block';
+        ph.parentNode.replaceChild(li, ph);
+      }
+    });
+
+    /* Play icon animation once the flex transition finishes */
     var iconFired = false;
     cw.addEventListener('transitionend', function onCardOpen(e) {
       if (e.target !== cw || iconFired) return;
       iconFired = true;
       cw.removeEventListener('transitionend', onCardOpen);
-      var icon = card.querySelector('.dp__head-icon lord-icon');
-      if (icon) icon.setAttribute('trigger', 'in');
+      var li = card.querySelector('.dp__head-icon lord-icon');
+      if (li) {
+        var pollId = setInterval(function() {
+          var p = li.playerInstance;
+          if (p && p.isReady) {
+            clearInterval(pollId);
+            try { p.play(); } catch (err) {}
+          }
+        }, 50);
+        setTimeout(function() { clearInterval(pollId); }, 3000);
+      }
     });
 
     if (needsCorrection) {
