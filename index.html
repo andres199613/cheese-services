@@ -675,6 +675,8 @@ var CARD_GAP = 0;
 var VISIBLE  = 4.3;
 var carouselIdx = 0;
 var expandedCw  = null;  /* currently expanded card wrapper */
+var scrollRecoveryHandler = null; /* post-loop iframeResizer reset recovery (mobile) */
+var expandScrollTarget = 0;       /* scroll target captured on expand (mobile) */
 
 /* Cache original card icon + desc at init so we can restore after expanding */
 var cardData = {};
@@ -903,8 +905,27 @@ function expandCard(cw) {
       if (performance.now() < loopDeadline) {
         requestAnimationFrame(rafLoop);
       } else {
-        /* Final snap at loop end (replaces the old post-snap setTimeout) */
+        /* Final snap at loop end */
         mobileSnap(target, 'post');
+        /* Install persistent recovery: iframeResizer resets scrollLeft to 0
+           after notifying Wix of the iframe height change. We detect this as a
+           single-event drop > 200px landing near 0 (user swipes produce small
+           per-event deltas, never > 200px at once). */
+        expandScrollTarget = target;
+        if (scrollRecoveryHandler) viewport.removeEventListener('scroll', scrollRecoveryHandler);
+        var prevSLExpand = target;
+        scrollRecoveryHandler = function() {
+          var cur = viewport.scrollLeft;
+          if ((prevSLExpand - cur) > 200 && cur < 50 && expandedCw) {
+            console.log('[cheese] RECOVER-expand | was:', prevSLExpand, '→', cur, '| snapping to', target);
+            try { viewport.scrollTo({ left: target, behavior: 'instant' }); } catch (e) {}
+            viewport.scrollLeft = target;
+            prevSLExpand = target;
+          } else {
+            prevSLExpand = cur;
+          }
+        };
+        viewport.addEventListener('scroll', scrollRecoveryHandler);
       }
     };
     requestAnimationFrame(rafLoop);
@@ -996,6 +1017,33 @@ function collapseCard(cw, instant) {
     cw.style.transition = "";
   }
   card.setAttribute("aria-expanded", "false");
+  /* Mobile: install a one-shot recovery so that when iframeResizer resets
+     scrollLeft to 0 (iframe shrinks → Wix resize → browser scroll reset),
+     we snap back to the card's last expand position, keeping it visible. */
+  if (instant && expandScrollTarget > 0) {
+    if (scrollRecoveryHandler) viewport.removeEventListener('scroll', scrollRecoveryHandler);
+    var collapseTarget = expandScrollTarget;
+    var prevSLCollapse = viewport.scrollLeft;
+    scrollRecoveryHandler = function() {
+      var cur = viewport.scrollLeft;
+      if ((prevSLCollapse - cur) > 200 && cur < 50) {
+        console.log('[cheese] RECOVER-collapse | was:', prevSLCollapse, '→', cur, '| snapping to', collapseTarget);
+        try { viewport.scrollTo({ left: collapseTarget, behavior: 'instant' }); } catch (e) {}
+        viewport.scrollLeft = collapseTarget;
+        viewport.removeEventListener('scroll', scrollRecoveryHandler);
+        scrollRecoveryHandler = null;
+      } else {
+        prevSLCollapse = cur;
+      }
+    };
+    viewport.addEventListener('scroll', scrollRecoveryHandler);
+    setTimeout(function() {
+      if (scrollRecoveryHandler) {
+        viewport.removeEventListener('scroll', scrollRecoveryHandler);
+        scrollRecoveryHandler = null;
+      }
+    }, 3000);
+  }
   if (expandedCw === cw) expandedCw = null;
 }
 
