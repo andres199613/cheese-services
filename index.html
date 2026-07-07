@@ -1082,7 +1082,7 @@ cards.forEach(function(cw) {
     if (!btn) return;
     e.preventDefault();
     try {
-      window.top.location.href = 'https://www.cheesemarketing.com.au/#Contact';
+      window.top.location.href = 'https://www.cheesemarketing.com.au/?scrollTo=Contact';
     } catch(err) {
       /* fallback if top navigation is blocked */
       window.parent.postMessage({ type: 'wix-scroll-to-anchor', anchor: 'section21' }, '*');
