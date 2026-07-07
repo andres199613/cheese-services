@@ -1081,7 +1081,9 @@ cards.forEach(function(cw) {
     var btn = e.target.closest('.btn-cta');
     if (!btn) return;
     e.preventDefault();
+    console.log('[cheese] CTA clicked — sending postMessage');
     window.parent.postMessage({ type: 'cheese-scroll', anchor: 'Contact' }, '*');
+    console.log('[cheese] postMessage sent');
   });
 </script>
 
