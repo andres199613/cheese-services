@@ -1081,12 +1081,7 @@ cards.forEach(function(cw) {
     var btn = e.target.closest('.btn-cta');
     if (!btn) return;
     e.preventDefault();
-    try {
-      window.top.location.href = 'https://www.cheesemarketing.com.au/?scrollTo=Contact';
-    } catch(err) {
-      /* fallback if top navigation is blocked */
-      window.parent.postMessage({ type: 'wix-scroll-to-anchor', anchor: 'section21' }, '*');
-    }
+    window.parent.postMessage({ type: 'wix-scroll-to-anchor', anchor: 'Contact' }, '*');
   });
 </script>
 
